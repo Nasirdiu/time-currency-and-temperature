@@ -1,0 +1,6 @@
+{
+  "name": "Meridian - World Time, Weather & Currency Suite",
+  "description": "An all-in-one global executive toolkit featuring live world clocks with meeting planner, accurate global weather forecasts, and real-time multi-currency converter.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
