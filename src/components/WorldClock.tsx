@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CityData, Language, TimeFormat } from '../types';
+import { CityData, Language, TempUnit, TimeFormat } from '../types';
 import { formatTimeInZone, formatDateInZone, getTimeDifferenceText, getHourAvailabilityCategory } from '../utils/time';
-import { Plus, Trash2, Sun, Moon, Sunrise, Sunset, Clock as ClockIcon, Users, Sliders, Sparkles } from 'lucide-react';
+import { getCityQuickWeather, QuickWeatherInfo } from '../services/quickWeather';
+import { Plus, Trash2, Sun, Moon, Clock as ClockIcon, Users, Sliders, Thermometer } from 'lucide-react';
 
 interface WorldClockProps {
   pinnedCities: CityData[];
@@ -9,6 +10,8 @@ interface WorldClockProps {
   onRemoveCity: (cityId: string) => void;
   lang: Language;
   timeFormat: TimeFormat;
+  tempUnit: TempUnit;
+  onSelectCityForWeather?: (city: CityData) => void;
 }
 
 export const WorldClock: React.FC<WorldClockProps> = ({
@@ -17,10 +20,14 @@ export const WorldClock: React.FC<WorldClockProps> = ({
   onRemoveCity,
   lang,
   timeFormat,
+  tempUnit,
+  onSelectCityForWeather,
 }) => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [sliderHourOffset, setSliderHourOffset] = useState<number>(0);
   const [isMeetingPlannerOpen, setIsMeetingPlannerOpen] = useState<boolean>(true);
+  const [cityWeatherMap, setCityWeatherMap] = useState<Record<string, QuickWeatherInfo>>({});
+  const [localWeather, setLocalWeather] = useState<QuickWeatherInfo | null>(null);
 
   // Tick every second for live accurate time
   useEffect(() => {
@@ -29,6 +36,55 @@ export const WorldClock: React.FC<WorldClockProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch live temperature for each pinned city
+  useEffect(() => {
+    let isSubscribed = true;
+    const loadTemps = async () => {
+      const promises = pinnedCities.map(async (city) => {
+        const w = await getCityQuickWeather(city.lat, city.lng);
+        return { id: city.id, w };
+      });
+      const results = await Promise.all(promises);
+      if (isSubscribed) {
+        const map: Record<string, QuickWeatherInfo> = {};
+        results.forEach((r) => {
+          if (r.w) map[r.id] = r.w;
+        });
+        setCityWeatherMap(map);
+      }
+    };
+    loadTemps();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [pinnedCities]);
+
+  // Fetch local user GPS weather
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const w = await getCityQuickWeather(pos.coords.latitude, pos.coords.longitude);
+          setLocalWeather(w);
+        },
+        async () => {
+          if (pinnedCities[0]) {
+            const w = await getCityQuickWeather(pinnedCities[0].lat, pinnedCities[0].lng);
+            setLocalWeather(w);
+          }
+        },
+        { timeout: 5000 }
+      );
+    }
+  }, []);
+
+  const convertTemp = (celsius: number): number => {
+    if (tempUnit === 'F') {
+      return Math.round((celsius * 9) / 5 + 32);
+    }
+    return Math.round(celsius);
+  };
 
   const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const localFormatted = formatTimeInZone(currentTime, localTimezone, timeFormat, true);
@@ -249,6 +305,18 @@ export const WorldClock: React.FC<WorldClockProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5">
+                    {/* Live Temperature Badge */}
+                    {cityWeatherMap[city.id] && (
+                      <button
+                        onClick={() => onSelectCityForWeather && onSelectCityForWeather(city)}
+                        title={lang === 'bn' ? 'আবহাওয়া দেখুন' : 'View weather forecast'}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-950/20 text-amber-300 text-xs font-mono font-bold hover:bg-amber-900/40 transition-colors"
+                      >
+                        <Thermometer className="h-3 w-3 text-amber-400" />
+                        <span>{convertTemp(cityWeatherMap[city.id].temp)}°{tempUnit}</span>
+                      </button>
+                    )}
+
                     {/* Day / Night indicator */}
                     <div
                       title={isNight ? 'Night' : 'Day'}
@@ -302,7 +370,14 @@ export const WorldClock: React.FC<WorldClockProps> = ({
                 {/* Footer metadata */}
                 <div className="flex items-center justify-between border-t border-slate-800/80 pt-3 text-xs text-slate-400">
                   <span>{dateStr}</span>
-                  <span className="font-mono text-cyan-400/90">{diffText}</span>
+                  <div className="flex items-center gap-2">
+                    {cityWeatherMap[city.id] && (
+                      <span className="text-slate-400 text-[11px]">
+                        {lang === 'bn' ? cityWeatherMap[city.id].conditionBnText : cityWeatherMap[city.id].conditionText}
+                      </span>
+                    )}
+                    <span className="font-mono text-cyan-400/90">{diffText}</span>
+                  </div>
                 </div>
               </div>
             );

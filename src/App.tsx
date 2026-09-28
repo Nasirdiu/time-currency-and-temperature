@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ActiveTab, CityData, Language, TempUnit, TimeFormat } from './types';
+import { ThemePalette, THEME_CONFIGS } from './types/theme';
 import { WORLD_CITIES, DEFAULT_PINNED_CITY_IDS } from './data/cities';
 import { Header } from './components/Header';
 import { WorldClock } from './components/WorldClock';
@@ -7,17 +8,23 @@ import { WeatherView } from './components/WeatherView';
 import { CurrencyConverter } from './components/CurrencyConverter';
 import { CityHub } from './components/CityHub';
 import { CitySearchModal } from './components/CitySearchModal';
+import { LoadingScreen } from './components/LoadingScreen';
+import { TopLoadingBar } from './components/TopLoadingBar';
+import { Logo } from './components/Logo';
 
-const STORAGE_PINNED_KEY = 'meridian_pinned_cities_v1';
-const STORAGE_LANG_KEY = 'meridian_lang_pref_v1';
-const STORAGE_FORMAT_KEY = 'meridian_format_pref_v1';
-const STORAGE_TEMP_KEY = 'meridian_temp_pref_v1';
+const STORAGE_PINNED_KEY = 'chronosphere_pinned_cities_v1';
+const STORAGE_LANG_KEY = 'chronosphere_lang_pref_v1';
+const STORAGE_FORMAT_KEY = 'chronosphere_format_pref_v1';
+const STORAGE_TEMP_KEY = 'chronosphere_temp_pref_v1';
+const STORAGE_THEME_KEY = 'chronosphere_theme_pref_v1';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('clock');
   const [lang, setLang] = useState<Language>('bn');
   const [timeFormat, setTimeFormat] = useState<TimeFormat>('12h');
   const [tempUnit, setTempUnit] = useState<TempUnit>('C');
+  const [theme, setTheme] = useState<ThemePalette>('aurora');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [pinnedCities, setPinnedCities] = useState<CityData[]>(() => {
     try {
@@ -46,6 +53,9 @@ export default function App() {
 
       const savedTemp = localStorage.getItem(STORAGE_TEMP_KEY) as TempUnit;
       if (savedTemp === 'C' || savedTemp === 'F') setTempUnit(savedTemp);
+
+      const savedTheme = localStorage.getItem(STORAGE_THEME_KEY) as ThemePalette;
+      if (savedTheme && THEME_CONFIGS[savedTheme]) setTheme(savedTheme);
     } catch {}
   }, []);
 
@@ -77,6 +87,13 @@ export default function App() {
     } catch {}
   };
 
+  const handleSetTheme = (t: ThemePalette) => {
+    setTheme(t);
+    try {
+      localStorage.setItem(STORAGE_THEME_KEY, t);
+    } catch {}
+  };
+
   const handleRemoveCity = (cityId: string) => {
     setPinnedCities((prev) => prev.filter((c) => c.id !== cityId));
   };
@@ -89,21 +106,49 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f17] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/20 selection:text-cyan-300">
+    <div className="min-h-screen bg-[#060a12] text-slate-100 flex flex-col font-sans relative selection:bg-cyan-500/25 selection:text-cyan-200">
+      {/* Top Page Progress Loading Bar */}
+      <TopLoadingBar isLoading={isLoading} theme={theme} />
+
+      {/* Initial App Launch Loading Screen */}
+      {isLoading && (
+        <LoadingScreen
+          onComplete={() => setIsLoading(false)}
+          lang={lang}
+          theme={theme}
+        />
+      )}
+
+      {/* Ambient background mesh glow */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[550px] opacity-40 blur-[130px] rounded-full ${theme === 'aurora' ? 'bg-cyan-600/20' : theme === 'emerald' ? 'bg-emerald-600/20' : theme === 'violet' ? 'bg-purple-600/25' : 'bg-amber-600/20'}`} />
+        <div className="absolute top-[450px] -left-48 w-[600px] h-[600px] bg-blue-600/10 blur-[140px] rounded-full" />
+        <div className="absolute top-[800px] -right-48 w-[600px] h-[600px] bg-indigo-600/10 blur-[140px] rounded-full" />
+      </div>
+
       {/* Top Bar Header */}
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setIsLoading(true);
+          setActiveTab(tab);
+          setTimeout(() => {
+            setIsLoading(false);
+          }, 500);
+        }}
         lang={lang}
         setLang={handleSetLang}
         timeFormat={timeFormat}
         setTimeFormat={handleSetTimeFormat}
         tempUnit={tempUnit}
         setTempUnit={handleSetTempUnit}
+        theme={theme}
+        setTheme={handleSetTheme}
+        onTriggerLoading={() => setIsLoading(true)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'clock' && (
           <WorldClock
             pinnedCities={pinnedCities}
@@ -111,6 +156,11 @@ export default function App() {
             onRemoveCity={handleRemoveCity}
             lang={lang}
             timeFormat={timeFormat}
+            tempUnit={tempUnit}
+            onSelectCityForWeather={(city) => {
+              setSelectedCity(city);
+              setActiveTab('weather');
+            }}
           />
         )}
 
@@ -143,12 +193,15 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-[#070b12] py-6 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div>
-            {lang === 'bn'
-              ? 'মেরিডিয়ান · গ্লোবাল ওয়ার্ল্ড ক্লক, ওয়েদার ও কারেন্সি কনভার্টার স্যুট'
-              : 'Meridian · Global World Clock, Weather & Currency Converter Suite'}
+      <footer className="relative z-10 border-t border-white/[0.06] bg-[#050811] py-6 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <Logo size="sm" theme={theme} />
+            <span className="text-slate-400 font-medium">
+              {lang === 'bn'
+                ? 'ক্রোনোস্ফিয়ার গ্লোবাল (ChronoSphere) · বিশ্ব ঘড়ি, আবহাওয়া ও মুদ্রা রূপান্তরকারী'
+                : 'ChronoSphere Global · World Clock, Weather & Currency Converter Suite'}
+            </span>
           </div>
           <div className="flex items-center gap-4 text-[11px] text-slate-400">
             <span>Open-Meteo Meteorological API</span>
