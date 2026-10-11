@@ -203,12 +203,22 @@ export default function App() {
                 : 'ChronoSphere Global · World Clock, Weather & Currency Converter Suite'}
             </span>
           </div>
-          <div className="flex items-center gap-4 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] text-slate-400">
             <span>Open-Meteo Meteorological API</span>
             <span aria-hidden="true">·</span>
             <span>Real-time Global Exchange Rates</span>
             <span aria-hidden="true">·</span>
-            <span>IANA Timezone Sync</span>
+            <a
+              href="https://nasir369.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-cyan-400 hover:text-cyan-300 transition-colors underline underline-offset-4"
+            >
+              <span>Nasir369</span>
+              <svg className="h-3 w-3 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
           </div>
         </div>
       </footer>
